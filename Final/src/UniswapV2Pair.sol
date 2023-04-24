@@ -111,11 +111,10 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         if (feeOn) {
             if (_kLast != 0) {
                 uint rootK = Math.sqrt(uint(_reserve0).mul(_reserve1));
-                uint rootKLast = Math.sqrt(_kLast);
-                if (rootK > rootKLast) {
-                    uint numerator = totalSupply.mul(rootK.sub(rootKLast));
-                    uint denominator = rootK.mul(5).add(rootKLast);
-                    uint liquidity = numerator / denominator;
+                if (rootK > Math.sqrt(_kLast)) {
+                    uint liquidity = totalSupply.mul(
+                        rootK.sub(Math.sqrt(_kLast))
+                    ) / rootK.mul(5).add(Math.sqrt(_kLast));
                     if (liquidity > 0) _mint(feeTo, liquidity);
                 }
             }
@@ -207,13 +206,14 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
             require(to != _token0 && to != _token1, "UniswapV2: INVALID_TO");
             if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
             if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
-            if (data.length > 0)
-                IUniswapV2Callee(to).uniswapV2Call(
-                    msg.sender,
-                    amount0Out,
-                    amount1Out,
-                    data
-                );
+            if (data.length > 0) {
+                // IUniswapV2Callee(to).uniswapV2Call(
+                //     msg.sender,
+                //     amount0Out,
+                //     amount1Out,
+                //     data
+                // );
+            }
             balance0 = IERC20(_token0).balanceOf(address(this));
             balance1 = IERC20(_token1).balanceOf(address(this));
         }
@@ -223,6 +223,7 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         uint amount1In = balance1 > _reserve1 - amount1Out
             ? balance1 - (_reserve1 - amount1Out)
             : 0;
+
         require(
             amount0In > 0 || amount1In > 0,
             "UniswapV2: INSUFFICIENT_INPUT_AMOUNT"

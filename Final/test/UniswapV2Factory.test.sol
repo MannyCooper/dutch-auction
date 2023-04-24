@@ -3,32 +3,34 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import "../src/UniswapV2Factory.sol";
-
-contract MockToken {
-    function transfer() public pure returns (bool) {
-        return true;
-    }
-}
+import "../src/ERC20Mock.sol";
 
 contract UniswapV2FactoryTest is Test {
     UniswapV2Factory factory;
-    MockToken tokenA;
-    MockToken tokenB;
+    ERC20Mock token0;
+    ERC20Mock token1;
+
+    function test() public {}
 
     function setUp() public {
         factory = new UniswapV2Factory(address(this));
-        tokenA = new MockToken();
-        tokenB = new MockToken();
+
+        token0 = new ERC20Mock("Token0", "T0");
+        token1 = new ERC20Mock("Token1", "T1");
+    }
+
+    function test_allPairsLength() public {
+        assertEq(factory.allPairsLength(), 0);
     }
 
     function test_createPair() public {
-        address pair = factory.createPair(address(tokenA), address(tokenB));
+        address pair = factory.createPair(address(token0), address(token1));
         assertTrue(pair != address(0));
-        assertTrue(factory.getPair(address(tokenA), address(tokenB)) == pair);
+        assertTrue(factory.getPair(address(token0), address(token1)) == pair);
     }
 
     function test_createPair_withIdenticalAddresses() public {
-        try factory.createPair(address(tokenA), address(tokenA)) {
+        try factory.createPair(address(token0), address(token0)) {
             assertTrue(
                 false,
                 "Pair should not be created with identical addresses"
@@ -39,7 +41,7 @@ contract UniswapV2FactoryTest is Test {
     }
 
     function test_createPair_withZeroAddress() public {
-        try factory.createPair(address(tokenA), address(0)) {
+        try factory.createPair(address(token0), address(0)) {
             assertTrue(false, "Pair should not be created with zero address");
         } catch Error(string memory reason) {
             assertEq(reason, "UniswapV2: ZERO_ADDRESS");
@@ -47,8 +49,8 @@ contract UniswapV2FactoryTest is Test {
     }
 
     function test_createPair_withExistingPair() public {
-        factory.createPair(address(tokenA), address(tokenB));
-        try factory.createPair(address(tokenA), address(tokenB)) {
+        factory.createPair(address(token0), address(token1));
+        try factory.createPair(address(token0), address(token1)) {
             assertTrue(false, "Pair should not be created again");
         } catch Error(string memory reason) {
             assertEq(reason, "UniswapV2: PAIR_EXISTS");
@@ -56,7 +58,7 @@ contract UniswapV2FactoryTest is Test {
     }
 
     function test_setFeeTo() public {
-        address newFeeTo = address(new MockToken());
+        address newFeeTo = address(new ERC20Mock("New Fee To", "NFT"));
         factory.setFeeTo(newFeeTo);
         assertEq(factory.feeTo(), newFeeTo);
     }
@@ -68,7 +70,9 @@ contract UniswapV2FactoryTest is Test {
     }
 
     function test_setFeeToSetter() public {
-        address newFeeToSetter = address(new MockToken());
+        address newFeeToSetter = address(
+            new ERC20Mock("New Fee To Setter", "NFTS")
+        );
         factory.setFeeToSetter(newFeeToSetter);
         assertEq(factory.feeToSetter(), newFeeToSetter);
     }
