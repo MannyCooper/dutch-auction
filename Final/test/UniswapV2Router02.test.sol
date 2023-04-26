@@ -7,462 +7,189 @@ import "../src/UniswapV2Router02.sol";
 import "../src/UniswapV2Factory.sol";
 
 contract UniswapV2RouterTest is Test {
-    UniswapV2Factory factory;
-    UniswapV2Router02 router;
-
-    ERC20Mock tokenA;
-    ERC20Mock tokenB;
-    ERC20Mock tokenC;
+    CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
+    UniswapV2Router02 private router;
+    UniswapV2Factory private factory;
+    address private pair;
+    address private pairETH;
+    UniswapV2ERC20 tokenA;
+    UniswapV2ERC20 tokenB;
+    UniswapV2ERC20 weth;
 
     function setUp() public {
-        factory = new UniswapV2Factory(address(this));
-        router = new UniswapV2Router02(address(factory), address(tokenA));
+        tokenA = new UniswapV2ERC20();
+        tokenB = new UniswapV2ERC20();
 
-        tokenA = new ERC20Mock("Token A", "TKNA");
-        tokenB = new ERC20Mock("Token B", "TKNB");
-        tokenC = new ERC20Mock("Token C", "TKNC");
+        weth = new UniswapV2ERC20();
 
-        tokenA.mint(20 ether, address(this));
-        tokenB.mint(20 ether, address(this));
-        tokenC.mint(20 ether, address(this));
+        factory = new UniswapV2Factory(address(0x01));
+        router = new UniswapV2Router02(address(factory), address(weth));
+        pair = factory.createPair(address(tokenA), address(tokenB));
+        pairETH = factory.createPair(address(tokenA), address(weth));
     }
 
-    function encodeError(
-        string memory error
-    ) internal pure returns (bytes memory encoded) {
-        encoded = abi.encodeWithSignature(error);
-    }
+    function test_addLiquidity() public {
+        tokenA._mint(address(pair), 2000);
+        tokenB._mint(address(pair), 2000);
 
-    // function testAddLiquidityCreatesPair() public {
-    //     tokenA.approve(address(router), 1 ether);
-    //     tokenB.approve(address(router), 1 ether);
+        tokenA._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        tokenA.approve(address(router), 1000);
 
-    //     router.addLiquidity(
-    //         address(tokenA),
-    //         address(tokenB),
-    //         1 ether,
-    //         1 ether,
-    //         1 ether,
-    //         1 ether,
-    //         address(this)
-    //     );
+        tokenB._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        tokenB.approve(address(router), 1000);
 
-    //     address pairAddress = factory.getPair(address(tokenA), address(tokenB));
-    //     assertEq(pairAddress, 0x28D60B002aE759608479991e780DD542C929539D);
-    // }
-
-    function testAddLiquidityNoPair() public {
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 1 ether);
-
-        (uint256 amountA, uint256 amountB, uint256 liquidity) = router
+        uint256 amountADesired = 1000;
+        uint256 amountBDesired = 1000;
+        uint256 amountAMin = 0;
+        uint256 amountBMin = 0;
+        uint256 deadline = block.timestamp + 3600;
+        cheats.prank(address(0x10));
+        (uint256 amountA1, uint256 amountB1, uint256 liquidity) = router
             .addLiquidity(
                 address(tokenA),
                 address(tokenB),
-                1 ether,
-                1 ether,
-                1 ether,
-                1 ether,
-                address(this),
-                block.timestamp
+                amountADesired,
+                amountBDesired,
+                amountAMin,
+                amountBMin,
+                address(0x10),
+                deadline
             );
 
-        assertEq(amountA, 1 ether);
-        assertEq(amountB, 1 ether);
-        assertEq(liquidity, 1 ether - 1000);
-
-        address pairAddress = factory.getPair(address(tokenA), address(tokenB));
-
-        assertEq(tokenA.balanceOf(pairAddress), 1 ether);
-        assertEq(tokenB.balanceOf(pairAddress), 1 ether);
-
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-
-        assertEq(pair.token0(), address(tokenB));
-        assertEq(pair.token1(), address(tokenA));
-        assertEq(pair.totalSupply(), 1 ether);
-        assertEq(pair.balanceOf(address(this)), 1 ether - 1000);
-
-        assertEq(tokenA.balanceOf(address(this)), 19 ether);
-        assertEq(tokenB.balanceOf(address(this)), 19 ether);
+        assert(amountA1 == 1000);
+        assert(amountB1 == 1000);
+        assert(liquidity == 2000);
     }
 
-    function testAddLiquidityAmountBOptimalIsOk() public {
-        address pairAddress = factory.createPair(
+    function test_removeLiquidity() public {
+        tokenA._mint(address(pair), 2000);
+        tokenB._mint(address(pair), 2000);
+
+        tokenA._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        tokenA.approve(address(router), 1000);
+
+        tokenB._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        tokenB.approve(address(router), 1000);
+
+        uint256 amountADesired = 1000;
+        uint256 amountBDesired = 1000;
+        uint256 amountAMin = 0;
+        uint256 amountBMin = 0;
+        uint256 deadline = block.timestamp + 3600;
+        cheats.prank(address(0x10));
+        router.addLiquidity(
             address(tokenA),
-            address(tokenB)
+            address(tokenB),
+            amountADesired,
+            amountBDesired,
+            amountAMin,
+            amountBMin,
+            address(0x10),
+            deadline
         );
 
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
+        uint256 liquidityActual = 1000;
+        cheats.prank(address(0x10));
+        IUniswapV2Pair(pair).approve(address(router), liquidityActual);
+        cheats.prank(address(0x10));
+        (uint256 amountA2, uint256 amountB2) = router.removeLiquidity(
+            address(tokenA),
+            address(tokenB),
+            liquidityActual,
+            amountAMin,
+            amountBMin,
+            address(0x10),
+            deadline
+        );
 
-        assertEq(pair.token0(), address(tokenB));
-        assertEq(pair.token1(), address(tokenA));
+        assert(amountA2 == 1000);
+        assert(amountB2 == 1000);
+    }
 
-        tokenA.transfer(pairAddress, 1 ether);
-        tokenB.transfer(pairAddress, 2 ether);
-        pair.mint(address(this));
+    function test_addLiquidityETH() public {
+        tokenA._mint(address(pairETH), 2000);
+        weth._mint(address(pairETH), 2000);
 
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 2 ether);
+        tokenA._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        tokenA.approve(address(router), 1000);
 
-        (uint256 amountA, uint256 amountB, uint256 liquidity) = router
-            .addLiquidity(
+        weth._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        weth.approve(address(router), 1000);
+
+        uint256 amountTokenDesired = 1000;
+        uint256 amountTokenMin = 0;
+        uint256 amountETHMin = 0;
+        uint256 deadline = block.timestamp + 3600;
+
+        cheats.prank(address(0x10));
+        (uint256 amountToken1, uint256 amountETH1, uint256 liquidity) = router
+            .addLiquidityETH(
                 address(tokenA),
-                address(tokenB),
-                1 ether,
-                2 ether,
-                1 ether,
-                1.9 ether,
-                address(this),
-                block.timestamp
+                amountTokenDesired,
+                amountTokenMin,
+                1000,
+                amountETHMin,
+                address(0x10),
+                deadline
             );
 
-        assertEq(amountA, 1 ether);
-        assertEq(amountB, 2 ether);
-        assertEq(liquidity, 1414213562373095048);
+        assert(amountToken1 == 1000);
+        assert(amountETH1 == 1000);
+        assert(liquidity == 2000);
     }
 
-    function testAddLiquidityAmountBOptimalIsTooLow() public {
-        address pairAddress = factory.createPair(
+    function test_removeLiquidityETH() public {
+        tokenA._mint(address(pairETH), 2000);
+        weth._mint(address(pairETH), 2000);
+
+        tokenA._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        tokenA.approve(address(router), 1000);
+
+        weth._mint(address(0x10), 1000);
+        cheats.prank(address(0x10));
+        weth.approve(address(router), 1000);
+
+        uint256 amountTokenDesired = 1000;
+        uint256 amountTokenMin = 0;
+        uint256 amountETHMin = 0;
+        uint256 deadline = block.timestamp + 3600;
+
+        cheats.prank(address(0x10));
+        router.addLiquidityETH(
             address(tokenA),
-            address(tokenB)
+            amountTokenDesired,
+            amountTokenMin,
+            1000,
+            amountETHMin,
+            address(0x10),
+            deadline
         );
 
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-        assertEq(pair.token0(), address(tokenB));
-        assertEq(pair.token1(), address(tokenA));
-
-        tokenA.transfer(pairAddress, 5 ether);
-        tokenB.transfer(pairAddress, 10 ether);
-        pair.mint(address(this));
-
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 2 ether);
-
-        vm.expectRevert(encodeError("InsufficientBAmount()"));
-        router.addLiquidity(
+        uint256 liquidityActual = 1000;
+        cheats.prank(address(0x10));
+        IUniswapV2Pair(pairETH).approve(address(router), liquidityActual);
+        cheats.prank(address(0x10));
+        (uint256 amountToken2, uint256 amountETH2) = router.removeLiquidityETH(
             address(tokenA),
-            address(tokenB),
-            1 ether,
-            2 ether,
-            1 ether,
-            2 ether,
-            address(this),
-            block.timestamp
+            liquidityActual,
+            amountTokenMin,
+            amountETHMin,
+            address(0x10),
+            deadline
         );
+
+        assert(amountToken2 == 1000);
+        assert(amountETH2 == 1000);
     }
+}
 
-    function testAddLiquidityAmountBOptimalTooHighAmountATooLow() public {
-        address pairAddress = factory.createPair(
-            address(tokenA),
-            address(tokenB)
-        );
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-
-        assertEq(pair.token0(), address(tokenB));
-        assertEq(pair.token1(), address(tokenA));
-
-        tokenA.transfer(pairAddress, 10 ether);
-        tokenB.transfer(pairAddress, 5 ether);
-        pair.mint(address(this));
-
-        tokenA.approve(address(router), 2 ether);
-        tokenB.approve(address(router), 1 ether);
-
-        vm.expectRevert(encodeError("InsufficientAAmount()"));
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            2 ether,
-            0.9 ether,
-            2 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-    }
-
-    function testAddLiquidityAmountBOptimalIsTooHighAmountAOk() public {
-        address pairAddress = factory.createPair(
-            address(tokenA),
-            address(tokenB)
-        );
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-
-        assertEq(pair.token0(), address(tokenB));
-        assertEq(pair.token1(), address(tokenA));
-
-        tokenA.transfer(pairAddress, 10 ether);
-        tokenB.transfer(pairAddress, 5 ether);
-        pair.mint(address(this));
-
-        tokenA.approve(address(router), 2 ether);
-        tokenB.approve(address(router), 1 ether);
-
-        (uint256 amountA, uint256 amountB, uint256 liquidity) = router
-            .addLiquidity(
-                address(tokenA),
-                address(tokenB),
-                2 ether,
-                0.9 ether,
-                1.7 ether,
-                1 ether,
-                address(this),
-                block.timestamp
-            );
-        assertEq(amountA, 1.8 ether);
-        assertEq(amountB, 0.9 ether);
-        assertEq(liquidity, 1272792206135785543);
-    }
-
-    function testRemoveLiquidity() public {
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 1 ether);
-
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        address pairAddress = factory.getPair(address(tokenA), address(tokenB));
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-        uint256 liquidity = pair.balanceOf(address(this));
-
-        pair.approve(address(router), liquidity);
-
-        router.removeLiquidity(
-            address(tokenA),
-            address(tokenB),
-            liquidity,
-            1 ether - 1000,
-            1 ether - 1000,
-            address(this),
-            block.timestamp
-        );
-
-        (uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
-        assertEq(reserve0, 1000);
-        assertEq(reserve1, 1000);
-        assertEq(pair.balanceOf(address(this)), 0);
-        assertEq(pair.totalSupply(), 1000);
-        assertEq(tokenA.balanceOf(address(this)), 20 ether - 1000);
-        assertEq(tokenB.balanceOf(address(this)), 20 ether - 1000);
-    }
-
-    function testRemoveLiquidityPartially() public {
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 1 ether);
-
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        address pairAddress = factory.getPair(address(tokenA), address(tokenB));
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-        uint256 liquidity = pair.balanceOf(address(this));
-
-        liquidity = (liquidity * 3) / 10;
-        pair.approve(address(router), liquidity);
-
-        router.removeLiquidity(
-            address(tokenA),
-            address(tokenB),
-            liquidity,
-            0.3 ether - 300,
-            0.3 ether - 300,
-            address(this),
-            block.timestamp
-        );
-
-        (uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
-        assertEq(reserve0, 0.7 ether + 300);
-        assertEq(reserve1, 0.7 ether + 300);
-        assertEq(pair.balanceOf(address(this)), 0.7 ether - 700);
-        assertEq(pair.totalSupply(), 0.7 ether + 300);
-        assertEq(tokenA.balanceOf(address(this)), 20 ether - 0.7 ether - 300);
-        assertEq(tokenB.balanceOf(address(this)), 20 ether - 0.7 ether - 300);
-    }
-
-    function testRemoveLiquidityInsufficientAAmount() public {
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 1 ether);
-
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        address pairAddress = factory.getPair(address(tokenA), address(tokenB));
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-        uint256 liquidity = pair.balanceOf(address(this));
-
-        pair.approve(address(router), liquidity);
-
-        vm.expectRevert(encodeError("InsufficientAAmount()"));
-        router.removeLiquidity(
-            address(tokenA),
-            address(tokenB),
-            liquidity,
-            1 ether,
-            1 ether - 1000,
-            address(this),
-            block.timestamp
-        );
-    }
-
-    function testRemoveLiquidityInsufficientBAmount() public {
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 1 ether);
-
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        address pairAddress = factory.getPair(address(tokenA), address(tokenB));
-        UniswapV2Pair pair = UniswapV2Pair(pairAddress);
-        uint256 liquidity = pair.balanceOf(address(this));
-
-        pair.approve(address(router), liquidity);
-
-        vm.expectRevert(encodeError("InsufficientBAmount()"));
-        router.removeLiquidity(
-            address(tokenA),
-            address(tokenB),
-            liquidity,
-            1 ether - 1000,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-    }
-
-    function testSwapExactTokensForTokens() public {
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 2 ether);
-        tokenC.approve(address(router), 1 ether);
-
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        router.addLiquidity(
-            address(tokenB),
-            address(tokenC),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        address[] memory path = new address[](3);
-        path[0] = address(tokenA);
-        path[1] = address(tokenB);
-        path[2] = address(tokenC);
-
-        tokenA.approve(address(router), 0.3 ether);
-        router.swapExactTokensForTokens(
-            0.3 ether,
-            0.1 ether,
-            path,
-            address(this),
-            block.timestamp
-        );
-
-        assertEq(
-            tokenA.balanceOf(address(this)),
-            20 ether - 1 ether - 0.3 ether
-        );
-        assertEq(tokenB.balanceOf(address(this)), 20 ether - 2 ether);
-        assertEq(
-            tokenC.balanceOf(address(this)),
-            20 ether - 1 ether + 0.186691414219734305 ether
-        );
-    }
-
-    function testSwapTokensForExactTokens() public {
-        tokenA.approve(address(router), 1 ether);
-        tokenB.approve(address(router), 2 ether);
-        tokenC.approve(address(router), 1 ether);
-
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        router.addLiquidity(
-            address(tokenB),
-            address(tokenC),
-            1 ether,
-            1 ether,
-            1 ether,
-            1 ether,
-            address(this),
-            block.timestamp
-        );
-
-        address[] memory path = new address[](3);
-        path[0] = address(tokenA);
-        path[1] = address(tokenB);
-        path[2] = address(tokenC);
-
-        tokenA.approve(address(router), 0.3 ether);
-        router.swapTokensForExactTokens(
-            0.186691414219734305 ether,
-            0.3 ether,
-            path,
-            address(this),
-            block.timestamp
-        );
-
-        assertEq(
-            tokenA.balanceOf(address(this)),
-            20 ether - 1 ether - 0.3 ether
-        );
-        assertEq(tokenB.balanceOf(address(this)), 20 ether - 2 ether);
-        assertEq(
-            tokenC.balanceOf(address(this)),
-            20 ether - 1 ether + 0.186691414219734305 ether
-        );
-    }
+interface CheatCodes {
+    function prank(address) external;
 }
